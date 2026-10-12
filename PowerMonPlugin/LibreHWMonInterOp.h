@@ -192,8 +192,10 @@ namespace InterOpLibreHWMon {
 		SmallData, // MB = 2^20 Bytes
 		Throughput, // B/s
 		TimeSpan, // Seconds 
+		Timing, // ns
 		Energy, // milliwatt-hour (mWh)
 		Noise, // dBA
+		Conductivity, // uS/cm
 		Humidity // %
 	};
 	static std::wstring GetSensorTypeUnitString(SensorTypeCopy sensorType) {
@@ -228,15 +230,31 @@ namespace InterOpLibreHWMon {
 			return L"B/s";
 		case SensorTypeCopy::TimeSpan:
 			return L"Seconds";
+		case SensorTypeCopy::Timing:
+			return L"ns";
 		case SensorTypeCopy::Energy:
 			return L"mWh";
 		case SensorTypeCopy::Noise:
 			return L"dBA";
+		case SensorTypeCopy::Conductivity:
+			return L"uS/cm";
 		case SensorTypeCopy::Humidity:
 			return L"%";
 		default:
 			return L"Unknown";
 		}
+	}
+
+	// Single-device plausibility bound (W). RAPL energy counters can wrap or
+	// reset between samples and then produce one-shot kW-range values; such
+	// readings are dropped so they never reach the display.
+	constexpr double kMaxPlausibleDevicePowerW = 1000.0;
+
+	static bool IsPlausibleSensorValue(SensorTypeCopy sensor_type, double value)
+	{
+		if (sensor_type != SensorTypeCopy::Power)
+			return true;
+		return value >= 0.0 && value <= kMaxPlausibleDevicePowerW;
 	}
 
 	class HardwareRepresentiveBase;
@@ -584,11 +602,11 @@ namespace InterOpLibreHWMon {
 					sensor_id, sen_type)) {
 					auto& sensor_rep = hw_rep.GetSensorsMap()[sensor_id];
 
-					if (sensor->Value.HasValue) {
+					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) {
 						sensor_rep.SetValue(sensor->Value.Value,
 							_update_index);
 					}
-					else {
+					else if (!sensor->Value.HasValue) {
 						sensor_rep.SetValue(false);
 					}
 
@@ -599,7 +617,7 @@ namespace InterOpLibreHWMon {
 					hw_rep.GetSensorsMap()[sensor_id] = SensorRepresentiveBase(
 						&hw_rep, sensor_id, ClrStringToStdWstring(sensor->Name),
 						sen_type,
-						sensor->Value.HasValue ? sensor->Value.Value : -1, _update_index);
+						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) ? sensor->Value.Value : -1, _update_index);
 				}
 			}
 			return true;
@@ -652,8 +670,10 @@ namespace InterOpLibreHWMon {
 					sensor_id, sen_type)) {
 					auto& sensor_rep = hw_rep.GetSensorsMap()[sensor_id];
 
-					hw_rep.GetSensorsMap()[sensor_id].SetValue(sensor->Value.HasValue ? sensor->Value.Value : -1,
-						_update_index);
+					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value))
+						hw_rep.GetSensorsMap()[sensor_id].SetValue(sensor->Value.Value, _update_index);
+					else if (!sensor->Value.HasValue)
+						hw_rep.GetSensorsMap()[sensor_id].SetValue(-1, _update_index);
 				}
 				else {
 
@@ -661,7 +681,7 @@ namespace InterOpLibreHWMon {
 					hw_rep.GetSensorsMap()[sensor_id] = SensorRepresentiveBase(
 						&hw_rep, sensor_id, ClrStringToStdWstring(sensor->Name),
 						sen_type,
-						sensor->Value.HasValue ? sensor->Value.Value : -1, _update_index);
+						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) ? sensor->Value.Value : -1, _update_index);
 				}
 			}
 			return true;
