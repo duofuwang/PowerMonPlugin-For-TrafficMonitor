@@ -59,6 +59,10 @@ void CDataManager::LoadConfig(const std::wstring& config_dir)
 			1, m_config_path.c_str());
 		m_setting_data.default_max_adaptive_decimal_places = GetPrivateProfileInt(L"config",
 			L"default_max_adaptive_decimal_places", 2, m_config_path.c_str());
+		m_setting_data.max_plausible_power_w = GetPrivateProfileInt(L"config",
+			L"max_plausible_power_w", 200, m_config_path.c_str());
+		if (m_setting_data.max_plausible_power_w < 10 || m_setting_data.max_plausible_power_w > 100000)
+			m_setting_data.max_plausible_power_w = 200;
 
 		::GetPrivateProfileString(L"config", L"pwr_unit_str", L"",
 			m_setting_data.pwr_unit_str.GetBuffer(UNIT_STR_MAXLEN + 1),
@@ -151,6 +155,8 @@ void CDataManager::SaveConfig() const
 			(m_setting_data.default_value_unit_space), m_config_path.c_str());
 		WritePrivateProfileInt(L"config", L"default_max_adaptive_decimal_places",
 			(m_setting_data.default_max_adaptive_decimal_places), m_config_path.c_str());
+		WritePrivateProfileInt(L"config", L"max_plausible_power_w",
+			(int)(m_setting_data.max_plausible_power_w), m_config_path.c_str());
 
 		WritePrivateProfileString(L"config", L"pwr_unit_str",
 			m_setting_data.pwr_unit_str, m_config_path.c_str());

@@ -11,6 +11,12 @@ using namespace LibreHardwareMonitor::Hardware;
 
 //using namespace Windows::Foundation::Collections;
 namespace InterOpLibreHWMon {
+	// Single-device plausibility bound (W). RAPL energy counter wrap/reset
+	// produces one-shot spike values across a wide range (hundreds of watts up
+	// to kW); readings outside [0, bound] are dropped and keep the last value.
+	// The bound is configurable via the plugin ini key max_plausible_power_w.
+	constexpr double kDefaultMaxPlausibleDevicePowerW = 200.0;
+
 	//将CRL的String类型转换成C++的std::wstring类型
 	static std::wstring ClrStringToStdWstring(System::String^ str)
 	{
@@ -63,6 +69,7 @@ namespace InterOpLibreHWMon {
 
 
 
+		double _max_plausible_power_w = kDefaultMaxPlausibleDevicePowerW;
 		Computer^ _p_IO_Computer{};
 		PowerSensorUpdateVisitor^ _power_sensor_update_visitor{};
 	public:
@@ -84,6 +91,10 @@ namespace InterOpLibreHWMon {
 
 		Computer^ GetComputorInfoInstance() {
 			return _p_IO_Computer;
+		}
+
+		double GetMaxPlausiblePowerW() {
+			return _max_plausible_power_w;
 		}
 
 
@@ -110,6 +121,8 @@ namespace InterOpLibreHWMon {
 
 			_power_sensor_update_visitor->SetCpuMonitorEnable(_cpu_mon_enable);
 			_power_sensor_update_visitor->SetGpuMonitorEnable(_gpu_mon_enable);
+			_max_plausible_power_w = (setting_data.max_plausible_power_w >= 10)
+				? (double)setting_data.max_plausible_power_w : kDefaultMaxPlausibleDevicePowerW;
 
 
 
@@ -245,16 +258,11 @@ namespace InterOpLibreHWMon {
 		}
 	}
 
-	// Single-device plausibility bound (W). RAPL energy counters can wrap or
-	// reset between samples and then produce one-shot kW-range values; such
-	// readings are dropped so they never reach the display.
-	constexpr double kMaxPlausibleDevicePowerW = 1000.0;
-
-	static bool IsPlausibleSensorValue(SensorTypeCopy sensor_type, double value)
+	static bool IsPlausibleSensorValue(SensorTypeCopy sensor_type, double value, double max_power_w)
 	{
 		if (sensor_type != SensorTypeCopy::Power)
 			return true;
-		return value >= 0.0 && value <= kMaxPlausibleDevicePowerW;
+		return value >= 0.0 && value <= max_power_w;
 	}
 
 	class HardwareRepresentiveBase;
@@ -588,6 +596,7 @@ namespace InterOpLibreHWMon {
 			val_store[hwid].SetUpdateIterIndex(_update_index);
 
 			auto& hw_rep = val_store[hwid];
+			const double max_power_w = LibreHWMonInterOpProxy::Instance()->GetMaxPlausiblePowerW();
 			for (int sen_iter = 0; sen_iter < sensor_list->Length; sen_iter++) {
 				ISensor^ sensor = sensor_list[sen_iter];
 
@@ -602,7 +611,7 @@ namespace InterOpLibreHWMon {
 					sensor_id, sen_type)) {
 					auto& sensor_rep = hw_rep.GetSensorsMap()[sensor_id];
 
-					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) {
+					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value, max_power_w)) {
 						sensor_rep.SetValue(sensor->Value.Value,
 							_update_index);
 					}
@@ -617,7 +626,7 @@ namespace InterOpLibreHWMon {
 					hw_rep.GetSensorsMap()[sensor_id] = SensorRepresentiveBase(
 						&hw_rep, sensor_id, ClrStringToStdWstring(sensor->Name),
 						sen_type,
-						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) ? sensor->Value.Value : -1, _update_index);
+						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value, max_power_w)) ? sensor->Value.Value : -1, _update_index);
 				}
 			}
 			return true;
@@ -656,6 +665,7 @@ namespace InterOpLibreHWMon {
 			val_store[hwid].SetUpdateIterIndex(_update_index);
 
 			auto& hw_rep = val_store[hwid];
+			const double max_power_w = LibreHWMonInterOpProxy::Instance()->GetMaxPlausiblePowerW();
 			for (int sen_iter = 0; sen_iter < sensor_list->Length; sen_iter++) {
 				ISensor^ sensor = sensor_list[sen_iter];
 
@@ -670,7 +680,7 @@ namespace InterOpLibreHWMon {
 					sensor_id, sen_type)) {
 					auto& sensor_rep = hw_rep.GetSensorsMap()[sensor_id];
 
-					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value))
+					if (sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value, max_power_w))
 						hw_rep.GetSensorsMap()[sensor_id].SetValue(sensor->Value.Value, _update_index);
 					else if (!sensor->Value.HasValue)
 						hw_rep.GetSensorsMap()[sensor_id].SetValue(-1, _update_index);
@@ -681,7 +691,7 @@ namespace InterOpLibreHWMon {
 					hw_rep.GetSensorsMap()[sensor_id] = SensorRepresentiveBase(
 						&hw_rep, sensor_id, ClrStringToStdWstring(sensor->Name),
 						sen_type,
-						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value)) ? sensor->Value.Value : -1, _update_index);
+						(sensor->Value.HasValue && IsPlausibleSensorValue(sen_type, sensor->Value.Value, max_power_w)) ? sensor->Value.Value : -1, _update_index);
 				}
 			}
 			return true;

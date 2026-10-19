@@ -14,6 +14,7 @@ struct SettingData
 	bool enable_cpu_monitor = false;
 	INT64 default_value_unit_space = 1;
 	INT64 default_max_adaptive_decimal_places = 2;
+	INT64 max_plausible_power_w = 200;
 	CString pwr_unit_str{};
 	CString electric_capacity_unit_str{};
 	CString electric_voltage_unit_str{};
@@ -33,6 +34,7 @@ struct SettingData
 		this->enable_cpu_monitor = other.enable_cpu_monitor;
 		this->default_value_unit_space = other.default_value_unit_space;
 		this->default_max_adaptive_decimal_places = other.default_max_adaptive_decimal_places;
+		this->max_plausible_power_w = other.max_plausible_power_w;
 
 		// Copy CString members using StrCpyNW
 		StrCpyNW(this->pwr_unit_str.GetBuffer(UNIT_STR_MAXLEN),

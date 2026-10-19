@@ -165,6 +165,8 @@ int COptionsDlg::SyncWidgetWithSettingData() {
 
 
 
+	hw_sensor_page.SetDlgItemInt(IDC_INPUT_MAX_POWER, (UINT)m_data.max_plausible_power_w, FALSE);
+
 	unit_string_page.SetDlgItemInt(IDC_INPUT_SPACING_SIZE, m_data.default_value_unit_space, FALSE);
 	unit_string_page.SetDlgItemInt(IDC_INPUT_DISPLAY_MAX_DECI_PLACES, m_data.default_max_adaptive_decimal_places, FALSE);
 
@@ -187,6 +189,12 @@ int COptionsDlg::SyncSettingDataWithWidget() {
 
 	if (!bTranslated || m_data.default_max_adaptive_decimal_places < 0) {
 		m_data.default_max_adaptive_decimal_places = 2;
+	}
+
+	bTranslated = FALSE;
+	m_data.max_plausible_power_w = hw_sensor_page.GetDlgItemInt(IDC_INPUT_MAX_POWER, &bTranslated, FALSE);
+	if (!bTranslated || m_data.max_plausible_power_w < 10 || m_data.max_plausible_power_w > 100000) {
+		m_data.max_plausible_power_w = 200;
 	}
 
 
